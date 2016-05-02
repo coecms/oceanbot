@@ -6,19 +6,64 @@ program oceanbot
        nc_size, nc_print_attr, nc_v_init
   use cmdline_arguments, only: get_options, bad_options, have_args, option_exists, &
       has_value, get_value, assignment(=), next_arg, num_args
+  use iso_varying_string
+  use file_functions, only: stderr
+  use string_functions, only: join
 
   implicit none
 
-  character(len=1000) :: datafile, gridfile
+  character(len=1000) :: datafile, gridfile, outfile
 
   real, allocatable :: kmu(:,:), u(:,:,:,:), v(:,:,:,:), ubot(:,:,:), vbot(:,:,:), hu(:,:), lon(:), lat(:)
   integer, allocatable :: time(:)
 
   type(ncvar) :: ncv
 
-  integer :: i, j, k, id_grid, id_data, depth, nlon, nlat, nlvl, nmonth
+  integer :: i, j, k, id_grid, id_data, depth, nlon, nlat, nlvl, nmonth, error
 
   logical :: initialised = .false.
+
+  type (varying_string) :: myoptions(2)
+
+  ! These are our accepted command line options (see subroutine usage for
+  ! an explanation)
+  myoptions(1) = 'help'
+  myoptions(2) = 'outfile'
+
+  ! This call parses the command line arguments for command line options
+  call get_options(myoptions, error)
+
+  ! Check we weren't passed duff options -- spit the dummy if we were
+  if (error > 0) then
+     write(stderr,*) 'ERROR! Unknown options: ',join(bad_options()," ")
+     call usage
+     STOP
+  end if
+
+  ! Check if we just want to print the usage
+  if (option_exists('help')) then
+     call usage
+     STOP
+  end if
+
+  if (num_args() < 2) then
+     write(stderr,*) 'ERROR! Must supply ocean grid file and at least one data file as command-line arguments'
+     call usage
+     STOP
+  end if
+
+  if (option_exists('outfile')) then
+     ! We have specified variable name for vertical grid variable
+     if (.NOT. has_value('outfile')) then
+        write(stderr,*) 'Option outfile must specify a value!'
+        call usage
+        stop
+     end if
+     outfile = ""
+     outfile = get_value('outfile')
+  else
+     outfile = "botvel.nc"
+  end if
 
   ! Read in ocean grid file
   gridfile = next_arg()
@@ -107,7 +152,7 @@ program oceanbot
   print *,'read hu'
   call nc_read(trim(gridfile),"hu",hu,ncid=id_grid)
 
-  call save('botvel.nc',ubot,vbot,hu,time,lon,lat)
+  call save(trim(outfile),ubot,vbot,hu,time,lon,lat)
      
 contains
   
@@ -133,6 +178,21 @@ contains
     call nc_write(outfile,"vbot",vbot,dim1="xu_ocean",dim2="yu_ocean",dim3="time",missing_value=-1.e20,long_name="bottom v velocity",units="m/s")
     call nc_write(outfile,"hu",depth,dim1="xu_ocean",dim2="yu_ocean",missing_value=-1.e20,long_name="ocean depth on u-cells",units="m")
   end subroutine save
+
+ 
+  subroutine usage    
+  
+    write(stderr,*)
+    write(stderr,*) 'Output 2D bottom velocity field from 3D data'
+    write(stderr,*)
+    write(stderr,*) 'Usage: oceanbot [--help] gridfile datafiles'
+    write(stderr,*)
+    write(stderr,*) '  --help      - print this message'
+    write(stderr,*) '  --outfile   - name of output file (default: botvel.nc)'
+    write(stderr,*)
+
+  end subroutine usage
+
 
 end program oceanbot
 
