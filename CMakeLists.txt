@@ -9,8 +9,8 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(CMAKE_Fortran_FLAGS "-O -traceback")
 
-include_directories("/projects/v45/fortran/modules/")
-link_directories("/projects/v45/fortran/modules/")
+include_directories("$ENV{FORTRANMODULEDIR}")
+link_directories("$ENV{FORTRANMODULEDIR}")
 
 # Create an executable file 
 add_executable("oceanbot" "oceanbot.f90")
